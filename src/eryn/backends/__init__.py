@@ -4,7 +4,9 @@ from .backend import Backend
 
 from .hdfbackend import HDFBackend, TempHDFBackend
 
-__all__ = ["Backend", "HDFBackend", "TempHDFBackend", "get_test_backends"]
+from .supbackend import SupplementalBackend
+
+__all__ = ["Backend", "HDFBackend", "SupplementalBackend", "TempHDFBackend", "get_test_backends"]
 
 
 def get_test_backends():
