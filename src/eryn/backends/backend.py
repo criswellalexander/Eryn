@@ -307,7 +307,16 @@ class Backend(object):
                 for key in branch_names_in
             }
             return v_all
-
+        
+        # prepare supplemental chain for output
+        if name == "chain_supplemental":
+            v_all = {
+                key: {supp_key: self.chain_supplemental[key][supp_key][discard + thin - 1 : self.iteration : thin, temp_index]
+                      for supp_key in self.chain_supplemental[key].keys()}
+                for key in branch_names_in
+            }
+            return v_all
+        
         # prepare inds for output
         if name == "inds":
             v_all = {
