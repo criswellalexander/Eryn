@@ -198,7 +198,7 @@ class SupplementalBackend(Backend):
         
         ## chain_supplemental mimics the chain, but is a nested dict of branch_name:{supplemental_name:supp_chain}
         if self.nbranches > 1:
-            raise Warning("nbranches is > 1, which is not yet supported for the SupplemetalBackend.\
+            raise Warning("nbranches is > 1, which is not yet supported for the SupplementalBackend.\
                            Supplementals are assumed to be associated with the branch at position 0 ({}).".format(self.branch_names[0]))
         self.chain_supplemental = {name:{supp_name:np.empty((0,
                                                              self.ntemps,

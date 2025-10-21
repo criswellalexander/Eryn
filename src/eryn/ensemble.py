@@ -100,6 +100,11 @@ class EnsembleSampler(object):
         provide_supplemental (bool, optional): If ``True``, it will provide keyword arguments to
             the Likelihood function: ``supps`` and ``branch_supps``. Please see the `Tutorial <https://mikekatz04.github.io/Eryn/Eryn_tutorial.html#>`_
             and :class:`eryn.state.BranchSupplemental` for more information.
+        dynamic_branch_supplemental (bool, optional): Requires provide_supplemental. If ``True``, it will pass the BranchSupplemental
+            object itself directly to the likelihood, thereby allowing the likelihood to modify the BranchSupplemental directly.
+            This is useful for cases with hierarchical or latent variables which should be tracked along with the chain.
+            Warning: this is currently only implemented for the single-branch case. Multiple branches are allowed, but the 
+            dynamic supplemental will be assumed to be associated with branch 0.
         tempering_kwargs (dict, optional): Keyword arguments for initialization of the
             tempering class: :class:`eryn.moves.tempering.TemperatureControl`.  (default: ``{}``)
         branch_names (list, optional): List of branch names. If ``None``, models will be assigned
@@ -215,6 +220,7 @@ class EnsembleSampler(object):
         priors,
         provide_groups=False,
         provide_supplemental=False,
+        dynamic_branch_supplemental=False,
         tempering_kwargs={},
         branch_names=None,
         nbranches=1,
@@ -250,6 +256,7 @@ class EnsembleSampler(object):
         # store some kwargs
         self.provide_groups = provide_groups
         self.provide_supplemental = provide_supplemental
+        self.dynamic_branch_supplemental = dynamic_branch_supplemental
         self.fill_zero_leaves_val = fill_zero_leaves_val
         self.num_repeats_in_model = num_repeats_in_model
         self.num_repeats_rj = num_repeats_rj
@@ -1293,8 +1300,10 @@ class EnsembleSampler(object):
                     """supps and branch_supps are both None. If self.provide_supplemental
                        is True, must provide some supplemental information."""
                 )
-            if branch_supps is not None:
+            if branch_supps is not None and not self.dynamic_branch_supplemental:
                 branch_supps_in = {}
+            elif branch_supps is not None and self.dynamic_branch_supplemental:
+                branch_supps_in = branch_supps
 
         # determine groupings from inds
         groups = groups_from_inds(inds_copy)
@@ -1328,7 +1337,7 @@ class EnsembleSampler(object):
             x_in[name] = coords_i[inds_copy[name]]
 
             # prepare branch supplementals for each branch
-            if self.provide_supplemental:
+            if self.provide_supplemental and not self.dynamic_branch_supplemental:
                 if branch_supps is not None:  #  and
                     if branch_supps[name] is not None:
                         # index the branch supps
@@ -1383,15 +1392,21 @@ class EnsembleSampler(object):
                 if supps is not None:
                     kwargs_in["supps"] = supps_in
                 if branch_supps is not None:
-                    # get list of branch_supps values
-                    branch_supps_in_2 = list(branch_supps_in.values())
-
-                    # if only one entry, take out of list
-                    if len(branch_supps_in_2) == 1:
-                        kwargs_in["branch_supps"] = branch_supps_in_2[0]
-
+                    if not self.dynamic_branch_supplemental:
+                        # get list of branch_supps values
+                        branch_supps_in_2 = list(branch_supps_in.values())
+    
+                        # if only one entry, take out of list
+                        if len(branch_supps_in_2) == 1:
+                            kwargs_in["branch_supps"] = branch_supps_in_2[0]
+    
+                        else:
+                            kwargs_in["branch_supps"] = branch_supps_in_2
                     else:
-                        kwargs_in["branch_supps"] = branch_supps_in_2
+                        ## dynamic supplementals passes the BranchSupplemental directly to be edited in-place
+                        ## the desired behavior must be implemented by the user in their likelihood
+                        kwargs_in["branch_supps"] = branch_supps
+                        kwargs_in["inds"] = inds_copy
 
             # provide args, kwargs as a tuple
             args_and_kwargs = (args_in, kwargs_in)
@@ -1445,15 +1460,20 @@ class EnsembleSampler(object):
                                 # make sure there is a dictionary ready in this kwarg dictionary
                                 if "branch_supps" not in kwarg_i:
                                     kwarg_i["branch_supps"] = {}
-
-                                # fill these branch supplementals for the specific group
-                                if branch_supps_in[branch_name_i] is not None:
-                                    # get list of branch_supps values
-                                    kwarg_i["branch_supps"][branch_name_i] = (
-                                        branch_supps_in[branch_name_i][inds_keep]
-                                    )
+                                
+                                if self.dynamic_branch_supplemental:
+                                    ## pass correct indices to the likelihood
+                                    kwarg_i["branch_supps"] = branch_supps
+                                    kwarg_i["inds"] = inds_keep
                                 else:
-                                    kwarg_i["branch_supps"][branch_name_i] = None
+                                    # fill these branch supplementals for the specific group
+                                    if branch_supps_in[branch_name_i] is not None:
+                                        # get list of branch_supps values
+                                        kwarg_i["branch_supps"][branch_name_i] = (
+                                            branch_supps_in[branch_name_i][inds_keep]
+                                        )
+                                    else:
+                                        kwarg_i["branch_supps"][branch_name_i] = None
 
                 # if only one model type, will take out of groups
                 add_term = arg_i[0] if len(groups_in) == 1 else arg_i
