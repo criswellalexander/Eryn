@@ -6,7 +6,7 @@ import numpy as np
 from itertools import count
 from copy import deepcopy
 
-from .backends import Backend, HDFBackend
+from .backends import Backend, HDFBackend, SupplementalBackend
 from .model import Model
 from .moves import StretchMove, TemperatureControl, DistributionGenerateRJ, GaussianMove
 from .pbar import get_progress_bar
@@ -1578,6 +1578,11 @@ class EnsembleSampler(object):
         return self.get_value("chain", **kwargs)
 
     get_chain.__doc__ = Backend.get_chain.__doc__
+
+    def get_chain_supplemental(self,**kwargs):
+        return self.backend.get_chain_supplemental(**kwargs)
+    
+    get_chain_supplemental.__doc__ = SupplementalBackend.get_chain_supplemental.__doc__
 
     def get_blobs(self, **kwargs):
         return self.get_value("blobs", **kwargs)
