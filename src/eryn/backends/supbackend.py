@@ -392,7 +392,7 @@ class SupplementalBackend(Backend):
             
             ## also save the supplemental
             for supp_key in self.chain_supplemental[key].keys():
-                self.chain_supplemental[key][supp_key][self.iteration] = state.branches_supplemental[key][0][supp_key]
+                self.chain_supplemental[key][supp_key][self.iteration] = state.branches_supplemental[key][...][supp_key]
 
         # save higher level quantities
         self.log_like[self.iteration, :, :] = state.log_like
