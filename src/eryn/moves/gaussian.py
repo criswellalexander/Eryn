@@ -182,7 +182,7 @@ class _diagonal_proposal(_isotropic_proposal):
 
 
 class _proposal(_isotropic_proposal):
-    allowed_modes = ["vector"]
+    allowed_modes = ["vector","random","sequential"]
 
     def get_updated_vector(self, rng, x0):
         return x0 + self.get_factor(rng) * rng.multivariate_normal(
