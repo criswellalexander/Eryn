@@ -1215,6 +1215,9 @@ class EnsembleSampler(object):
                 # vectorized because everything is rectangular (no groups to indicate model difference)
                 prior_out += prior_out_temp.sum(axis=-1)
 
+        if np.any(np.isnan(prior_out)):
+            raise ValueError("The prior function is returning Nan.")
+        
         return prior_out
 
     def compute_log_like(
@@ -1516,8 +1519,9 @@ class EnsembleSampler(object):
             ll[inds_fix_zeros] = self.fill_zero_leaves_val
 
             # deal with blobs
-            blobs_out = np.zeros((nwalkers_all, results.shape[1] - 1))
-            blobs_out[unique_groups] = results[:, 1:]
+            _blobs_out = np.zeros((nwalkers_all, results.shape[1] - 1))
+            _blobs_out[unique_groups] = results[:, 1:]
+            blobs_out = _blobs_out.reshape(ntemps, nwalkers)
 
         elif results.dtype == "object":
             # TODO: check blobs and add this capability
@@ -1554,6 +1558,9 @@ class EnsembleSampler(object):
                                 for key in branch_supps_in_2[name_i]
                             }
 
+        if np.any(np.isnan(ll)):
+            raise ValueError("The likelihood function is returning Nan.")
+        
         # return Likelihood and blobs
         return ll.reshape(ntemps, nwalkers), blobs_out
 
