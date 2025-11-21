@@ -1464,7 +1464,10 @@ class EnsembleSampler(object):
                                 if self.dynamic_branch_supplemental:
                                     ## pass correct indices to the likelihood
                                     kwarg_i["branch_supps"] = branch_supps
-                                    kwarg_i["inds"] = inds_keep
+                                    ## need to expand back to full shape
+                                    inds_keep_temp = np.argwhere(np.arange(ntemps*nwalkers).reshape(ntemps,nwalkers) == group_i).flatten()
+                                    inds_keep_temp = np.concatenate((inds_keep_temp,np.array([0])))
+                                    kwarg_i["inds"] = inds_keep_temp
                                 else:
                                     # fill these branch supplementals for the specific group
                                     if branch_supps_in[branch_name_i] is not None:
