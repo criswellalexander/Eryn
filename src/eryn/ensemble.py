@@ -13,7 +13,7 @@ from .pbar import get_progress_bar
 from .state import State
 from .prior import ProbDistContainer
 
-# from .utils import PlotContainer
+from .utils import PlotContainer
 from .utils import PeriodicContainer
 from .utils.utility import groups_from_inds
 
@@ -203,6 +203,7 @@ class EnsembleSampler(object):
             if it is changed. In this case, the user should declare a new backend and use the last
             state from the previous backend. **Warning**: If the order of moves of the same move class
             is changed, the check may not catch it, so the tracking may mix move acceptance fractions together.
+            (default: ``True'')
         info (dict, optional): Key and value pairs reprenting any information
             the user wants to add to the backend if the user is not inputing
             their own backend.
@@ -238,7 +239,7 @@ class EnsembleSampler(object):
         blobs_dtype=None,  # TODO check this
         plot_iterations=-1,  # TODO: do plot stuff?
         plot_generator=None,
-        plot_name=None,
+        plot_folder=None,
         periodic=None,
         update_fn=None,
         update_iterations=-1,
@@ -604,6 +605,7 @@ class EnsembleSampler(object):
                 nleaves_max=nleaves_max,
                 rj=self.has_reversible_jump,
                 moves=move_keys,
+                key_order=self.key_order,
                 **info,
             )
             state = np.random.get_state()
@@ -622,6 +624,9 @@ class EnsembleSampler(object):
                         "Configuration of moves has changed. Cannot use the same backend. Declare a new backend and start from the previous state. If you would prefer not to track move acceptance fraction, set track_moves to False in the EnsembleSampler."
                     )
 
+            if self.key_order != self.backend.key_order:
+                raise ValueError("Input key order from priors does not match backend.")
+            
             # Check the backend shape
             for i, (name, shape) in enumerate(self.backend.shape.items()):
                 test_shape = (
@@ -664,18 +669,15 @@ class EnsembleSampler(object):
         self.plot_iterations = plot_iterations
 
         if plot_generator is None and self.plot_iterations > 0:
-            raise NotImplementedError
             # set to default if not provided
-            if plot_name is not None:
-                name = plot_name
-            else:
-                name = "output"
+            if plot_folder is  None:
+                plot_folder = "./runtime_plots"
             self.plot_generator = PlotContainer(
-                fp=name, backend=self.backend, thin_chain_by_ac=True
+                backend=self.backend, plots=['base', 'rj'], parent_folder=plot_folder, discard=0.2
             )
         elif self.plot_iterations > 0:
-            raise NotImplementedError
             self.plot_generator = plot_generator
+            self.plot_generator.backend = self.backend # make sure backend is correctly set
 
         # prepare stopping functions
         self.stopping_fn = stopping_fn
@@ -696,7 +698,7 @@ class EnsembleSampler(object):
 
         """
         return self._random.get_state()
-
+    
     @random_state.setter  # NOQA
     def random_state(self, state):
         """
@@ -758,13 +760,14 @@ class EnsembleSampler(object):
         else:
             raise ValueError("Priors must be a dictionary.")
 
+        self.key_order = {key: value.key_order for key, value in self._priors.items()}
         return
 
     @property
     def iteration(self):
         return self.backend.iteration
 
-    def reset(self, **info):
+    def reset(self, **kwargs):
         """
         Reset the backend.
 
@@ -772,7 +775,7 @@ class EnsembleSampler(object):
             **info (dict, optional): information to pass to backend reset method.
 
         """
-        self.backend.reset(self.nwalkers, self.ndims, **info)
+        self.backend.reset(self.nwalkers, self.ndims, **kwargs)
 
     def __getstate__(self):
         # In order to be generally picklable, we need to discard the pool
@@ -1108,7 +1111,7 @@ class EnsembleSampler(object):
             # diagnostic plots
             # TODO: adjust diagnostic plots
             if self.plot_iterations > 0 and (i + 1) % (self.plot_iterations) == 0:
-                self.plot_generator.generate_plot_info()  # TODO: remove defaults
+                self.plot_generator.produce_plots(sampler=self)  # TODO: remove defaults
 
             # check for stopping before updating
             if (
@@ -1327,7 +1330,7 @@ class EnsembleSampler(object):
             temp_unique_groups, inverse = np.unique(group, return_inverse=True)
 
             # use groups_map by finding where temp_unique_groups overlaps with unique_groups
-            keep_groups = groups_map[np.in1d(unique_groups, temp_unique_groups)]
+            keep_groups = groups_map[np.isin(unique_groups, temp_unique_groups)]
 
             # fill group information for Likelihood
             ll_groups[key] = keep_groups[inverse]
